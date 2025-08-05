@@ -15,7 +15,7 @@ project-root/
 │
 ├── invites/                   # Output folder for personalized PDFs
 ├── utils/
-│   ├── Nandila Wedding Invitation.pdf  # Original invitation template (3 pages)
+│   ├── invitation.pdf        # Original invitation template (3 pages)
 │   └── PTC75F.ttf            # Custom font used in the invite
 ├── guest_list.csv            # CSV file with columns: Table, Name
 ├── stamp_invites.py          # Main script to generate invites
