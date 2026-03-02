@@ -2,9 +2,11 @@
 
 This project takes a base PDF wedding invitation and personalizes it for each guest by:
 
-- Adding the guest's **name** to Page 2
-- Adding a **QR code** to Page 3 (containing: `Table + Name`)
-- Saving each customized invite as a separate PDF in the `invites/` folder
+- Adding the guest's **name** to a chosen page (centered, custom font & color)
+- Adding a **QR code** to a chosen page (containing: `Table + Name`)
+- Saving each customized invite as a separate PDF in the output folder
+
+A **Tkinter GUI** lets you configure every setting visually with a live PDF preview before generating.
 
 ---
 
@@ -15,10 +17,10 @@ project-root/
 │
 ├── invites/                   # Output folder for personalized PDFs
 ├── utils/
-│   ├── invitation.pdf        # Original invitation template (3 pages)
+│   ├── invitation.pdf        # Original invitation template
 │   └── PTC75F.ttf            # Custom font used in the invite
 ├── guest_list.csv            # CSV file with columns: Table, Name
-├── stamp_invites.py          # Main script to generate invites
+├── app.py                    # GUI application
 ├── requirements.txt          # Python package dependencies
 └── README.md                 # This file
 ```
@@ -27,18 +29,18 @@ project-root/
 
 ## 🐍 Requirements
 
-- Python **3.10+** is required  
+- Python **3.10+** (tkinter is included with Python on Windows & macOS)
 - All other libraries are listed in `requirements.txt`
 
 ### 🔗 Download Python 3.10 or later
 
 [➡️ Download Python 3.10+ from the official site](https://www.python.org/downloads/)
 
+> **Linux users:** If tkinter is missing, run `sudo apt install python3-tk`
+
 ---
 
 ## 📦 Install Dependencies
-
-After installing Python 3.10+, install the required packages by running:
 
 ```bash
 pip install -r requirements.txt
@@ -59,17 +61,32 @@ Family,Col. Gilbert Fondufe
 ```
 
 - `Table`: Which side or group they belong to (e.g. "Bride", "Groom", "Family")
-- `Name`: Full name to be printed and encoded
+- `Name`: Full name to be printed and encoded in the QR code
 
 ---
 
-## 🚀 Run the Script
+## 🚀 Run the App
 
 ```bash
-python stamp_invites.py
+python app.py
 ```
 
-Each guest will get a **custom invitation PDF** saved inside the `invites/` folder.
+---
+
+## 🖥️ GUI Overview
+
+| Section | Settings |
+|---|---|
+| **Files** | Invite PDF, Font file, CSV file, Output folder |
+| **Text Settings** | Page (0-indexed), Font size, Text Y position, Text color |
+| **QR Code Settings** | Page (0-indexed), X/Y position, Size, QR color, Background color (with optional transparency) |
+| **Live Preview** | Renders the actual PDF page with overlaid name and QR position indicators; updates as you adjust settings |
+| **Log** | Per-guest progress output during generation |
+
+### Live Preview
+- The **yellow highlight** shows where the guest name will appear using the real font.
+- The **red box** shows the QR code position and size.
+- Toggle between **Text page** and **QR page** views using the radio buttons.
 
 ---
 
@@ -78,8 +95,8 @@ Each guest will get a **custom invitation PDF** saved inside the `invites/` fold
 ```
 invites/
 ├── Mr. John Doe - Wedding Invite.pdf
-├── Mrs. Adamou - Moussa Wedding Invite.pdf
-├── Col. Gilbert - Fondufe Wedding Invite.pdf
+├── Mrs. Adamou Moussa - Wedding Invite.pdf
+├── Col. Gilbert Fondufe - Wedding Invite.pdf
 ...
 ```
 
@@ -87,9 +104,7 @@ invites/
 
 ## 🧼 Cleanup
 
-The script will automatically:
-- Generate and insert a temporary QR image for each guest
-- Delete the QR image after each invite is saved
+The app automatically generates and deletes a temporary QR image for each guest after each invite is saved.
 
 ---
 

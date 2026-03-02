@@ -1,4 +1,6 @@
 PyMuPDF
 pandas
 Pillow
-qrcode
+qrcode[pil]
+# tkinter is part of Python's standard library (no pip install needed)
+# On Linux: sudo apt install python3-tk

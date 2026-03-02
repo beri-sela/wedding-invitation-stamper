@@ -10,3 +10,4 @@ __pycache__/
 .Python
 
 invites
+.claude/settings.local.json
