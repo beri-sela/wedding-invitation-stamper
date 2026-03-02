@@ -15,12 +15,15 @@ DEFAULTS = {
     "font_size":     12,
     "text_y":        108,
     "text_color":    "#000000",
+    "bold":          False,
+    "italic":        False,
     "page_qr":       1,   # 0-indexed page for QR code
     "qr_x":          118,
     "qr_y":          333,
     "qr_size":       63,
-    "qr_fg_color":   "#000000",
-    "qr_bg_color":   "#ffffff",
+    "qr_fg_color":        "#000000",
+    "qr_bg_color":        "#ffffff",
+    "qr_bg_transparent":  True,
 }
 
 
@@ -70,12 +73,16 @@ def run_stamper(config, log):
 
         os.makedirs(output_folder, exist_ok=True)
 
+        bold         = config.get("bold", False)
+        italic       = config.get("italic", False)
+
         font = fitz.Font(fontfile=font_path)
         log(f"[INFO] Loaded font: {font.name}")
 
         guests = pd.read_csv(csv_path)
         log(f"[INFO] Loaded {len(guests)} guests from {csv_path}")
 
+        import math
         for _, row in guests.iterrows():
             table = str(row["Table"]).strip()
             name  = str(row["Name"]).strip()
@@ -90,6 +97,15 @@ def run_stamper(config, log):
             x_centered = (page.rect.width - text_width) / 2
             fontname   = f"{page.insert_font(fontfile=font_path)}"
 
+            render_mode  = 2 if bold else 0
+            border_width = 0.3 if bold else 1
+
+            morph = None
+            if italic:
+                shear = math.tan(math.radians(15))
+                morph = (fitz.Point(x_centered, text_y),
+                         fitz.Matrix(1, 0, shear, 1, 0, 0))
+
             page.insert_text(
                 (x_centered, text_y),
                 name,
@@ -97,6 +113,9 @@ def run_stamper(config, log):
                 fontfile=font_path,
                 fontsize=font_size,
                 color=text_color,
+                render_mode=render_mode,
+                border_width=border_width,
+                morph=morph,
                 overlay=True,
             )
             log(f"[OK] Name inserted for {name}")
@@ -177,6 +196,16 @@ class App(tk.Tk):
         self.v_text_y     = self._spin_row(t, "Text Y:",       DEFAULTS["text_y"],    2,  0, 5000)
         self.v_text_color = self._color_row(t, "Text Color:",  DEFAULTS["text_color"], 3)
 
+        ttk.Label(t, text="Style:").grid(row=4, column=0, sticky="w", padx=4, pady=2)
+        style_frame = ttk.Frame(t)
+        style_frame.grid(row=4, column=1, columnspan=2, sticky="w", padx=4, pady=2)
+        self.v_bold   = tk.BooleanVar(value=DEFAULTS["bold"])
+        self.v_italic = tk.BooleanVar(value=DEFAULTS["italic"])
+        ttk.Checkbutton(style_frame, text="Bold",   variable=self.v_bold,
+                        command=self._schedule_preview).pack(side="left")
+        ttk.Checkbutton(style_frame, text="Italic", variable=self.v_italic,
+                        command=self._schedule_preview).pack(side="left", padx=(8, 0))
+
         q = ttk.LabelFrame(mid, text="QR Code Settings", padding=8)
         q.grid(row=0, column=1, sticky="nsew", **P)
         self.v_page_qr     = self._spin_row(q, "Page (0-idx):", DEFAULTS["page_qr"],     0,  0,  100)
@@ -194,9 +223,13 @@ class App(tk.Tk):
         self._qr_bg_pick = ttk.Button(q, text="Pick",
                                       command=lambda: self._pick_qr_bg())
         self._qr_bg_pick.grid(row=5, column=2, padx=4, pady=2)
-        self.v_qr_bg_transparent = tk.BooleanVar(value=False)
+        self.v_qr_bg_transparent = tk.BooleanVar(value=DEFAULTS["qr_bg_transparent"])
         ttk.Checkbutton(q, text="Transparent", variable=self.v_qr_bg_transparent,
                         command=self._toggle_qr_bg).grid(row=5, column=3, padx=4, pady=2)
+        # Apply initial disabled state when transparent is on by default
+        if DEFAULTS["qr_bg_transparent"]:
+            self._qr_bg_preview.config(state="disabled")
+            self._qr_bg_pick.config(state="disabled")
 
         # Generate
         self.btn = ttk.Button(ctrl, text="Generate Invites", command=self._generate)
@@ -230,8 +263,8 @@ class App(tk.Tk):
 
         # Traces → live preview
         for v in (self.v_pdf, self.v_font, self.v_page_text, self.v_font_size,
-                  self.v_text_y, self.v_text_color, self.v_page_qr,
-                  self.v_qr_x, self.v_qr_y, self.v_qr_size):
+                  self.v_text_y, self.v_text_color, self.v_bold, self.v_italic,
+                  self.v_page_qr, self.v_qr_x, self.v_qr_y, self.v_qr_size):
             v.trace_add("write", lambda *_: self._schedule_preview())
 
     # ── widget builders ───────────────────────────────────────────────────────
@@ -302,6 +335,8 @@ class App(tk.Tk):
             "font_size":  self.v_font_size.get(),
             "text_y":     self.v_text_y.get(),
             "text_color": self.v_text_color.get(),
+            "bold":       self.v_bold.get(),
+            "italic":     self.v_italic.get(),
             "page_qr":    self.v_page_qr.get(),
             "qr_x":              self.v_qr_x.get(),
             "qr_y":              self.v_qr_y.get(),
@@ -348,6 +383,9 @@ class App(tk.Tk):
                 except Exception:
                     pil_font = ImageFont.load_default()
 
+                bold   = cfg.get("bold", False)
+                italic = cfg.get("italic", False)
+
                 placeholder = "Guest Name"
                 bbox  = draw.textbbox((0, 0), placeholder, font=pil_font)
                 tw    = bbox[2] - bbox[0]
@@ -355,10 +393,30 @@ class App(tk.Tk):
                 asc, dsc = pil_font.getmetrics()
                 # fitz text_y is the baseline; PIL draws from the top
                 ty = cfg["text_y"] * scale - asc
-                # highlight band
-                draw.rectangle([tx - 2, ty, tx + tw + 2, ty + asc + dsc],
-                               fill=(255, 220, 0, 90))
-                draw.text((tx, ty), placeholder, font=pil_font, fill=cfg["text_color"])
+
+                # Draw text on a temporary surface so we can shear it for italic
+                text_surface = Image.new("RGBA", img.size, (0, 0, 0, 0))
+                sdraw = ImageDraw.Draw(text_surface, "RGBA")
+                sdraw.rectangle([tx - 2, ty, tx + tw + 2, ty + asc + dsc],
+                                fill=(255, 220, 0, 90))
+                # Bold: double-draw with 1 px offset
+                if bold:
+                    sdraw.text((tx + 1, ty), placeholder, font=pil_font,
+                               fill=cfg["text_color"])
+                sdraw.text((tx, ty), placeholder, font=pil_font, fill=cfg["text_color"])
+
+                if italic:
+                    import math as _math
+                    shear = _math.tan(_math.radians(15))
+                    # PIL AFFINE: for each output (x,y) → source (a·x+b·y+c, d·x+e·y+f)
+                    # Right-lean italic: source_x = x - shear*(y - pivot_y)
+                    pivot_y = ty + asc
+                    affine  = (1, -shear, shear * pivot_y, 0, 1, 0)
+                    text_surface = text_surface.transform(
+                        img.size, Image.AFFINE, affine, Image.BILINEAR)
+
+                img = Image.alpha_composite(img, text_surface)
+                draw = ImageDraw.Draw(img, "RGBA")  # rebind after composite
 
             # ── QR overlay (shown on its page) ──
             if which == "qr" or cfg["page_qr"] == page_idx:
@@ -416,6 +474,8 @@ class App(tk.Tk):
             "font_size":     self.v_font_size.get(),
             "text_y":        self.v_text_y.get(),
             "text_color":    self.v_text_color.get(),
+            "bold":          self.v_bold.get(),
+            "italic":        self.v_italic.get(),
             "page_qr":       self.v_page_qr.get(),
             "qr_x":          self.v_qr_x.get(),
             "qr_y":          self.v_qr_y.get(),
